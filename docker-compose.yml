@@ -10,6 +10,8 @@ services:
 
   listener:
     image: ghcr.io/hueske-digital/cronjobs:latest
+    env_file:
+      - .env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
