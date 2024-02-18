@@ -1,27 +1,34 @@
 import docker
 import os
+import time
 from docker.errors import APIError, NotFound
 
-container_name_to_restart = os.getenv('CONTAINER_NAME_TO_RESTART')
-if not container_name_to_restart:
-    print("Die Umgebungsvariable 'CONTAINER_NAME_TO_RESTART' muss gesetzt sein.")
-    exit(1)
+# Umgebungsvariablen auslesen
+container_name_to_restart = os.getenv('CONTAINER_NAME_TO_RESTART', 'cron')
+restart_cooldown = int(os.getenv('RESTART_COOLDOWN', '10'))  # Standardwert ist 10 Sekunden
+
 
 label_key = "ofelia.enabled"
 label_value = "true"
 
 client = docker.from_env()
 
+# Letzter Neustart-Zeitstempel
+last_restart_time = 0
+
 def restart_target_container():
+    global last_restart_time
+    current_time = time.time()
+    if current_time - last_restart_time < restart_cooldown:
+        print(f"Neustart abgebrochen, da der Cooldown von {restart_cooldown} Sekunden noch nicht abgelaufen ist.")
+        return
     try:
-        containers = client.containers.list(all=True, filters={"label": f"com.docker.compose.service={container_name_to_restart}"})
-        if not containers:
-            print(f"Keine Container gefunden, die dem Service {container_name_to_restart} entsprechen.")
-            return
+        containers = client.containers.list(all=True, filters={"name": container_name_to_restart})
         for container in containers:
             print(f"Versuche, Container {container.name} ({container.id}) neu zu starten...")
             container.restart()
             print(f"Container {container.name} erfolgreich neu gestartet.")
+            last_restart_time = time.time()
             return
     except APIError as e:
         print(f"Fehler beim Neustarten des Containers: {e}")
