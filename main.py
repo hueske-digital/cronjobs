@@ -2,27 +2,27 @@ import docker
 import os
 from docker.errors import APIError, NotFound
 
-# Lese den Namen des Containers/Services aus einer Umgebungsvariable
+# Umgebungsvariable auslesen
 container_name_to_restart = os.getenv('CONTAINER_NAME_TO_RESTART')
 if not container_name_to_restart:
     print("Die Umgebungsvariable 'CONTAINER_NAME_TO_RESTART' muss gesetzt sein.")
-    exit(1)  # Beendet das Skript mit einem Fehlercode, wenn die Variable nicht gesetzt ist
+    exit(1)
 
 label_key = "ofelia.enabled"
 label_value = "true"
 
 client = docker.from_env()
 
-def restart_container(container_name):
+def restart_target_container():
     try:
-        containers = client.containers.list(filters={"label": f"com.docker.compose.service={container_name}"})
+        # Listet alle laufenden Container auf und filtert nach dem Service-Namen
+        containers = client.containers.list(filters={"label": f"com.docker.compose.service={container_name_to_restart}"})
         for container in containers:
-            # Restartet den ersten gefundenen Container und beendet dann die Funktion
             container.restart()
-            print(f"Container {container.name} wurde neu gestartet.")
-            return
+            print(f"Container {container.name} wurde erfolgreich neu gestartet.")
+            break  # Beendet die Schleife nach dem ersten erfolgreichen Neustart
     except APIError as e:
-        print(f"Fehler beim Neustarten des Containers {container_name}: {e}")
+        print(f"Fehler beim Neustarten des Containers: {e}")
 
 def handle_event(event):
     if event.get("Type") == "container" and event.get("Action") == "start":
@@ -30,16 +30,15 @@ def handle_event(event):
         container = client.containers.get(container_id)
         labels = container.labels
 
-        # Überprüfe, ob das Label vorhanden ist
         if labels.get(label_key) == label_value:
-            container_service_name = container.attrs['Config']['Labels'].get('com.docker.compose.service')
-            # Überprüfe, ob der gestartete Container nicht der ist, der neu gestartet werden soll
-            if container_service_name != container_name_to_restart:
-                print(f"Container mit Label {label_key}:{label_value} gestartet: {container.name}")
-                restart_container(container_name_to_restart)
+            service_name = container.attrs['Config']['Labels'].get('com.docker.compose.service')
+            # Überprüft, ob der gestartete Container nicht der Zielcontainer ist
+            if service_name != container_name_to_restart:
+                print(f"Container {container.name} mit Label {label_key}:{label_value} gestartet.")
+                restart_target_container()
 
 def main():
-    print("Skript läuft und hört auf Container-Ereignisse...")
+    print("Lausche auf Container-Ereignisse...")
     try:
         for event in client.events(decode=True):
             handle_event(event)
