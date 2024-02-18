@@ -16,24 +16,20 @@ client = docker.from_env()
 # Letzter Neustart-Zeitstempel
 last_restart_time = 0
 
-def restart_target_container():
-    global last_restart_time
-    current_time = time.time()
-    if current_time - last_restart_time < restart_cooldown:
-        print(f"Neustart abgebrochen, da der Cooldown von {restart_cooldown} Sekunden noch nicht abgelaufen ist.")
-        return
+def restart_container_after_delay():
+    print(f"Warte {restart_delay} Sekunden, bevor der Container neu gestartet wird...")
+    time.sleep(restart_delay)
     try:
-        # Verwende den Service-Namen, um den Container zu identifizieren
+        # Verwendet das Label, um den Container basierend auf dem Service-Namen zu finden
         containers = client.containers.list(all=True, filters={"label": f"com.docker.compose.service={container_name_to_restart}"})
-        if containers:
-            for container in containers:
-                print(f"Versuche, Container {container.name} ({container.id}) neu zu starten...")
-                container.restart()
-                print(f"Container {container.name} erfolgreich neu gestartet.")
-                last_restart_time = time.time()
-                return
-        else:
+        if not containers:
             print(f"Keine Container gefunden, die dem Service {container_name_to_restart} entsprechen.")
+            return
+        for container in containers:
+            print(f"Versuche, Container {container.name} ({container.id}) neu zu starten...")
+            container.restart()
+            print(f"Container {container.name} wurde nach Verzögerung erfolgreich neu gestartet.")
+            return  # Beendet nach dem ersten erfolgreichen Neustart
     except APIError as e:
         print(f"Fehler beim Neustarten des Containers: {e}")
 
