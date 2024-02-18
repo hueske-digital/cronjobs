@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"
 )
 
@@ -68,7 +69,7 @@ func handleEvent(ctx context.Context, cli *client.Client, event types.EventsMess
 }
 
 func restartContainer(ctx context.Context, cli *client.Client, containerName string) {
-	err := cli.ContainerRestart(ctx, containerName, nil)
+	err := cli.ContainerRestart(ctx, containerName, &container.StopOptions{})
 	if err != nil {
 		fmt.Printf("Error restarting container %s: %v\n", containerName, err)
 	} else {
