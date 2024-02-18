@@ -1,68 +1,43 @@
-import docker
-import os
-import logging
-import sys
+import docker, os
+from docker.errors import APIError, NotFound
 
-# Konfiguriere das Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+label_key = os.getenv("LABEL_KEY", "ofelia.restart")
+label_value = os.getenv("LABEL_VALUE", "true)
+container_name_to_restart = os.getenv("CRON_CONTAINER", "cronjobs-cron-1")
 
-# Umgebungsvariablen
-CRON_CONTAINER_NAME = os.getenv("CRON_CONTAINER_NAME", "cron")
-LISTENER_LABEL_VALUE = os.getenv("LISTENER_LABEL_VALUE", "listener_container")
-LISTENER_LABEL_KEY = "com.docker.compose.service"
+client = docker.from_env()
 
-try:
-    # Verbindung zum Docker-Client herstellen
-    client = docker.from_env()
-except docker.errors.DockerException as e:
-    logging.error("Fehler beim Verbinden mit dem Docker Daemon: %s", e)
-    sys.exit(1)
-
-def get_current_stack_name():
-    """
-    Ermittelt den Namen des Compose-Stacks, in dem sich der Listener befindet.
-    """
+def restart_container(container_name):
     try:
-        current_container_id = os.getenv("HOSTNAME")
-        container = client.containers.get(current_container_id)
-        return container.labels.get("com.docker.compose.project")
-    except docker.errors.DockerException as e:
-        logging.error("Fehler beim Ermitteln des aktuellen Compose-Stacks: %s", e)
-        sys.exit(1)
+        container = client.containers.get(container_name)
+        container.restart()
+        print(f"Container {container_name} was restarted.")
+    except NotFound:
+        print(f"Container {container_name} not found.")
+    except APIError as e:
+        print(f"API error when restarting container {container_name}: {e}")
 
-def restart_cron_container(current_stack_name):
-    """
-    Startet den Cron-Container im aktuellen Compose-Stack neu.
-    """
+def handle_event(event):
+    if event.get("Type") == "container" and event.get("Action") == "start":
+        container_id = event.get("Actor").get("ID")
+        try:
+            container = client.containers.get(container_id)
+            labels = container.labels
+            if labels.get(label_key) == label_value:
+                print(f"Container with label {label_key}:{label_value} started: {container.name}")
+                restart_container(container_name_to_restart)
+        except NotFound:
+            print(f"Container {container_id} not found.")
+        except APIError as e:
+            print(f"API error when getting container {container_id}: {e}")
+
+def main():
+    print("Listening on container start events...")
     try:
-        for container in client.containers.list(all=True, filters={"label": f"com.docker.compose.project={current_stack_name}"}):
-            if container.labels.get(LISTENER_LABEL_KEY) == CRON_CONTAINER_NAME:
-                logging.info(f"Neustart des 'Cron'-Containers im Stack '{current_stack_name}'.")
-                container.restart()
-                break
-    except docker.errors.DockerException as e:
-        logging.error("Fehler beim Neustarten des 'Cron'-Containers: %s", e)
-
-def listen_for_container_starts():
-    """
-    Registriert ein Event-Listener, um auf Container-Start-Events zu hören.
-    """
-    current_stack_name = get_current_stack_name()
-    if not current_stack_name:
-        logging.error("Konnte den Namen des aktuellen Compose-Stacks nicht ermitteln.")
-        return
-
-    logging.info(f"Lausche auf startende Container im Stack '{current_stack_name}'...")
-    try:
-        for event in client.events(decode=True, filters={"event": "start"}):
-            event_stack_name = event['Actor']['Attributes'].get('com.docker.compose.project')
-            if event_stack_name == current_stack_name:
-                # Überprüft, ob der gestartete Container das spezifische Label hat
-                if event['Actor']['Attributes'].get('ofelia.restart') == 'true':
-                    restart_cron_container(current_stack_name)
-    except docker.errors.DockerException as e:
-        logging.error("Fehler beim Abhören von Docker Events: %s", e)
-        sys.exit(1)
+        for event in client.events(decode=True):
+            handle_event(event)
+    except Exception as e:
+        print(f"Unknown error: {e}")
 
 if __name__ == "__main__":
-    listen_for_container_starts()
+    main()
