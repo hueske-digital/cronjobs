@@ -2,7 +2,6 @@ import docker
 import os
 from docker.errors import APIError, NotFound
 
-# Umgebungsvariable auslesen
 container_name_to_restart = os.getenv('CONTAINER_NAME_TO_RESTART')
 if not container_name_to_restart:
     print("Die Umgebungsvariable 'CONTAINER_NAME_TO_RESTART' muss gesetzt sein.")
@@ -15,12 +14,15 @@ client = docker.from_env()
 
 def restart_target_container():
     try:
-        # Listet alle laufenden Container auf und filtert nach dem Service-Namen
-        containers = client.containers.list(filters={"label": f"com.docker.compose.service={container_name_to_restart}"})
+        containers = client.containers.list(all=True, filters={"label": f"com.docker.compose.service={container_name_to_restart}"})
+        if not containers:
+            print(f"Keine Container gefunden, die dem Service {container_name_to_restart} entsprechen.")
+            return
         for container in containers:
+            print(f"Versuche, Container {container.name} ({container.id}) neu zu starten...")
             container.restart()
-            print(f"Container {container.name} wurde erfolgreich neu gestartet.")
-            break  # Beendet die Schleife nach dem ersten erfolgreichen Neustart
+            print(f"Container {container.name} erfolgreich neu gestartet.")
+            return
     except APIError as e:
         print(f"Fehler beim Neustarten des Containers: {e}")
 
@@ -31,11 +33,8 @@ def handle_event(event):
         labels = container.labels
 
         if labels.get(label_key) == label_value:
-            service_name = container.attrs['Config']['Labels'].get('com.docker.compose.service')
-            # Überprüft, ob der gestartete Container nicht der Zielcontainer ist
-            if service_name != container_name_to_restart:
-                print(f"Container {container.name} mit Label {label_key}:{label_value} gestartet.")
-                restart_target_container()
+            print(f"Container {container.name} mit Label {label_key}:{label_value} gestartet.")
+            restart_target_container()
 
 def main():
     print("Lausche auf Container-Ereignisse...")
