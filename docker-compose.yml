@@ -10,6 +10,7 @@ services:
 
   listener:
     image: ghcr.io/hueske-digital/cronjobs:latest
+    restart: unless-stopped
     env_file:
       - .env
     volumes:
