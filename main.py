@@ -1,10 +1,13 @@
-import docker
+import docker, os
 from docker.errors import APIError, NotFound
 
-# Konfiguration
 label_key = "ofelia.enabled"
 label_value = "true"
-container_name_to_restart = "cron"
+
+container_name_to_restart = os.getenv('CONTAINER_NAME_TO_RESTART')
+if not container_name_to_restart:
+    print("Die Umgebungsvariable 'CONTAINER_NAME_TO_RESTART' muss gesetzt sein.")
+    exit(1)
 
 client = docker.from_env()
 
