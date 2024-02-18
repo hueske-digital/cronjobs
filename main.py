@@ -8,8 +8,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Umgebungsvariablen
 CRON_CONTAINER_NAME = os.getenv("CRON_CONTAINER_NAME", "cron")
-RESTART_LABEL = "ofelia.restart"
-STACK_LABEL = "com.docker.compose.project"
+LISTENER_LABEL_VALUE = os.getenv("LISTENER_LABEL_VALUE", "listener_container")
+LISTENER_LABEL_KEY = "com.docker.compose.service"
 
 try:
     # Verbindung zum Docker-Client herstellen
@@ -18,53 +18,51 @@ except docker.errors.DockerException as e:
     logging.error("Fehler beim Verbinden mit dem Docker Daemon: %s", e)
     sys.exit(1)
 
-# Speichert die IDs der bereits neugestarteten Stacks
-restarted_stacks = set()
-
-def restart_cron_container(compose_project):
+def get_current_stack_name():
     """
-    Startet den Cron-Container innerhalb des angegebenen Compose-Stacks neu.
+    Ermittelt den Namen des Compose-Stacks, in dem sich der Listener befindet.
     """
-    global restarted_stacks
-
-    # Überprüfe, ob der Stack bereits behandelt wurde
-    if compose_project in restarted_stacks:
-        return
-
     try:
-        for container in client.containers.list(all=True, filters={"label": f"{STACK_LABEL}={compose_project}"}):
-            labels = container.labels
-            if container.name == CRON_CONTAINER_NAME:
-                logging.info(f"Neustart des Containers: {container.name}")
+        current_container_id = os.getenv("HOSTNAME")
+        container = client.containers.get(current_container_id)
+        return container.labels.get("com.docker.compose.project")
+    except docker.errors.DockerException as e:
+        logging.error("Fehler beim Ermitteln des aktuellen Compose-Stacks: %s", e)
+        sys.exit(1)
+
+def restart_cron_container(current_stack_name):
+    """
+    Startet den Cron-Container im aktuellen Compose-Stack neu.
+    """
+    try:
+        for container in client.containers.list(all=True, filters={"label": f"com.docker.compose.project={current_stack_name}"}):
+            if container.labels.get(LISTENER_LABEL_KEY) == CRON_CONTAINER_NAME:
+                logging.info(f"Neustart des 'Cron'-Containers im Stack '{current_stack_name}'.")
                 container.restart()
-                restarted_stacks.add(compose_project)
                 break
     except docker.errors.DockerException as e:
-        logging.error("Fehler beim Neustarten des Containers: %s", e)
-
-def handle_start_event(event):
-    """
-    Verarbeitet Container-Start-Events.
-    """
-    attributes = event['Actor']['Attributes']
-    compose_project = attributes.get(STACK_LABEL)
-    restart_label = attributes.get(RESTART_LABEL)
-
-    # Wenn das Label gesetzt ist und zum ersten Mal in diesem Stack
-    if restart_label == "true" and compose_project and compose_project not in restarted_stacks:
-        restart_cron_container(compose_project)
+        logging.error("Fehler beim Neustarten des 'Cron'-Containers: %s", e)
 
 def listen_for_container_starts():
     """
     Registriert ein Event-Listener, um auf Container-Start-Events zu hören.
     """
+    current_stack_name = get_current_stack_name()
+    if not current_stack_name:
+        logging.error("Konnte den Namen des aktuellen Compose-Stacks nicht ermitteln.")
+        return
+
+    logging.info(f"Lausche auf startende Container im Stack '{current_stack_name}'...")
     try:
         for event in client.events(decode=True, filters={"event": "start"}):
-            handle_start_event(event)
+            event_stack_name = event['Actor']['Attributes'].get('com.docker.compose.project')
+            if event_stack_name == current_stack_name:
+                # Überprüft, ob der gestartete Container das spezifische Label hat
+                if event['Actor']['Attributes'].get('ofelia.restart') == 'true':
+                    restart_cron_container(current_stack_name)
     except docker.errors.DockerException as e:
         logging.error("Fehler beim Abhören von Docker Events: %s", e)
         sys.exit(1)
 
 if __name__ == "__main__":
-    logging.info("Lausche auf startende Container...")
     listen_for_container_starts()
