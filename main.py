@@ -2,7 +2,7 @@ import docker, os
 from docker.errors import APIError, NotFound
 
 label_key = os.getenv("LABEL_KEY", "ofelia.restart")
-label_value = os.getenv("LABEL_VALUE", "true)
+label_value = os.getenv("LABEL_VALUE", "true")
 container_name_to_restart = os.getenv("CRON_CONTAINER", "cronjobs-cron-1")
 
 client = docker.from_env()
