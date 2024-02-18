@@ -9,6 +9,8 @@ ENV GOARCH=amd64
 # Copy the local package files to the container's workspace.
 WORKDIR /go/src/app
 COPY main.go .
+COPY go.mod .
+COPY go.sum .
 
 # Build the command inside the container.
 # Use -a for a clean build and -ldflags '-extldflags "-static"' for a static build.
