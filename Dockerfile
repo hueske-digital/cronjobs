@@ -1,26 +1,15 @@
-# Stage 1: Build the Go binary
-FROM golang:alpine as builder
+# Verwenden Sie ein offizielles Python-Runtime-Image als Basis
+FROM python:3-slim
 
-# Set environment variable to ensure static build
-ENV CGO_ENABLED=0
-ENV GOOS=linux
-ENV GOARCH=amd64
+# Setzen Sie das Arbeitsverzeichnis im Container
+WORKDIR /app
 
-# Copy the local package files to the container's workspace.
-WORKDIR /go/src/app
-COPY main.go .
-COPY go.mod .
-COPY go.sum .
+# Kopieren Sie die Abhängigkeiten und installieren Sie diese
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Build the command inside the container.
-# Use -a for a clean build and -ldflags '-extldflags "-static"' for a static build.
-RUN go build -a -ldflags '-extldflags "-static"' -o /go/bin/app
+# Kopieren Sie den Rest des Anwendungs-Codes
+COPY main.py .
 
-# Stage 2: Create the scratch image
-FROM scratch
-
-# Copy the binary from the builder stage.
-COPY --from=builder /go/bin/app /app
-
-# Command to run
-ENTRYPOINT ["/app"]
+# Starten Sie die Anwendung
+CMD ["python", "./main.py"]
