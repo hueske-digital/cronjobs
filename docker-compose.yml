@@ -4,6 +4,14 @@ services:
   cron:
     image: mcuadros/ofelia:latest
     command: daemon --docker
+    labels:
+      ofelia.smtp-host: ${SMTP_HOST}
+      ofelia.smtp-port: ${SMTP_PORT}
+      ofelia.smtp-user: ${SMTP_USER}
+      ofelia.smtp-password: ${SMTP_PASS}
+      ofelia.email-to: ${SMTP_TO}
+      ofelia.email-from: ${SMTP_FROM}
+      mail-only-on-error: ${SMTP_ERROR}
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
