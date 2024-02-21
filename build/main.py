@@ -18,7 +18,7 @@ def restart_container(container_name):
         print(f"API error when restarting container {container_name}: {e}")
 
 def handle_event(event):
-    if event.get("Type") == "container" and event.get("Action") == "start":
+    if event.get("Type") == "container" and event.get("Action") in ["start", "stop"]:
         container_id = event.get("Actor").get("ID")
         try:
             container = client.containers.get(container_id)
@@ -32,7 +32,7 @@ def handle_event(event):
             print(f"API error when getting container {container_id}: {e}")
 
 def main():
-    print("Listening on container start events...")
+    print("Listening on container start and stop events...")
     try:
         for event in client.events(decode=True):
             handle_event(event)
