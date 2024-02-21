@@ -24,7 +24,7 @@ def handle_event(event):
             container = client.containers.get(container_id)
             labels = container.labels
             if labels.get(label_key) == label_value:
-                print(f"Container with label {label_key}:{label_value} started: {container.name}")
+                print(f"{container.name} {event.get('Action')}ed")
                 restart_container(container_name_to_restart)
         except NotFound:
             print(f"Container {container_id} not found.")
