@@ -11,7 +11,7 @@ services:
       ofelia.smtp-password: ${SMTP_PASS}
       ofelia.email-to: ${SMTP_TO}
       ofelia.email-from: ${SMTP_FROM}
-      mail-only-on-error: ${SMTP_ERROR}
+      ofelia.mail-only-on-error: ${SMTP_ERROR}
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
