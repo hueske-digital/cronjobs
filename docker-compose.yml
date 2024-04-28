@@ -4,6 +4,8 @@ services:
   cron:
     image: mcuadros/ofelia:latest
     command: daemon --docker
+    environment:
+      - TZ=Europe/Berlin
     labels:
       ofelia.smtp-host: ${SMTP_HOST}
       ofelia.smtp-port: ${SMTP_PORT}
@@ -21,5 +23,6 @@ services:
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - TZ=Europe/Berlin
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
