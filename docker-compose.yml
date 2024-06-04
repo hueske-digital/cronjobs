@@ -20,6 +20,7 @@ services:
 
   listener:
     image: ghcr.io/hueske-digital/cronjobs:latest
+    stop_grace_period: 1s
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
