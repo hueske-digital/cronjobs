@@ -1,9 +1,9 @@
-version: "3.8"
-
 services:
   cron:
     image: mcuadros/ofelia:latest
     command: daemon --docker
+    environment:
+      - TZ=Europe/Berlin
     labels:
       ofelia.smtp-host: ${SMTP_HOST}
       ofelia.smtp-port: ${SMTP_PORT}
