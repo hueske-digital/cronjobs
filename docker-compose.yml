@@ -1,10 +1,19 @@
 services:
   cron:
-    image: mcuadros/ofelia:latest
-    command: daemon --docker
+    image: ghcr.io/netresearch/ofelia:latest
+    command: ["daemon", "--docker-events", "--enable-web", "--web-address=:8081"]
+    restart: unless-stopped
     environment:
       - TZ=Europe/Berlin
+      # Web-UI Anbindung an Caddy (kein Host-Port, nur über caddy-Netz erreichbar)
+      - CADDY_DOMAIN=${CADDY_DOMAIN}
+      - CADDY_TYPE=${CADDY_TYPE:-external}
+      - CADDY_PORT=${CADDY_PORT:-8081}
+      - CADDY_AUTH=true
+      - CADDY_AUTH_GROUPS=${CADDY_AUTH_GROUPS:-}
     labels:
+      ofelia.service: "true"
+      # E-Mail (SMTP) Benachrichtigung
       ofelia.smtp-host: ${SMTP_HOST}
       ofelia.smtp-port: ${SMTP_PORT}
       ofelia.smtp-user: ${SMTP_USER}
@@ -12,14 +21,11 @@ services:
       ofelia.email-to: ${SMTP_TO}
       ofelia.email-from: ${SMTP_FROM}
       ofelia.mail-only-on-error: ${SMTP_ERROR}
-    restart: unless-stopped
+    networks:
+      default:
+      caddy:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  listener:
-    image: ghcr.io/hueske-digital/cronjobs:latest
-    restart: unless-stopped
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+networks:
+  caddy:
