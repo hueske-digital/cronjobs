@@ -26,6 +26,7 @@ services:
       caddy:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config.ini:/etc/ofelia/config.ini:ro
 
 networks:
   caddy:
